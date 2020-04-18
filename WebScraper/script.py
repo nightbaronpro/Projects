@@ -1,20 +1,70 @@
-import requests
+#Import the library
 from bs4 import BeautifulSoup
-from html.parser import HTMLParser
+import urllib.request
+import csv
 
-URL = 'https://www.amazon.com/Sony-Mirrorless-Digitial-3-0-Inch-16-50mm/dp/B00I8BICB2/ref=sr_1_1?dchild=1&keywords=sony+camera&qid=1586337304&sr=8-1'
+#Specify the URL
+urlpage = "http://www.fasttrack.co.uk/league-tables/tech-track-100/league-table/"
 
-headers = {
-    "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) snap Chromium/80.0.3987.163 Chrome/80.0.3987.163 Safari/537.36'
-}
+#Query the website and return the HTML to the variable 'page'
+page = urllib.request.urlopen(urlpage)
+#Parse the HTML using beautiful soup and store in variable 'soup'
+soup = BeautifulSoup(page, 'html.parser')
 
-page = requests.get(URL, headers=headers)
+print(soup)
 
-soup = BeautifulSoup(page.content, 'html.parser')
+#Find results within table
+table = soup.find('table', attrs={'class': 'tableSorter2'})
+results = table.find_all('tr')
+print('Number of results', len(results))
 
-title = soup.find(id="productTitle").get_text()
-price = soup.find(id="priceblock_ourprice").get_text()
-converted_price = price[0:5]
+#Create and write headers to a list:
+rows = []
+rows.append(['Rank', 'Company Name', 'Location', 'Year end', 'Annual sales rise over 3 years', 'Latest sales £000s', 'Staff', 'Comment'])
+print(rows)
 
-print(converted_price)
-print(title.strip())
+#Loop over results
+for result in results:
+    #Find all columns per results 
+    data = result.find_all('td')
+    #Check that column have data
+    if len(data) == 0:
+        continue
+    #Write columns to variable
+    rank = data[0].getText()
+    company = data[1].getText()
+    location = data[2].getText()
+    yearend = data[3].getText()
+    salerise = data[4].getText()
+    sales = data[5].getText()
+    staff = data[6].getText()
+    comment = data[7].getText() 
+    print('Company is ', company)
+    #Company is Revolut
+    print('Sales', sales)
+    #Sale *25,860
+    #Extract description from the name
+    companyname = data[1].find('span', attrs={'class':'company-name'}).getText()
+    description = company.replace(companyname, '')
+    
+    #Remove unwanted characters
+    sales = sales.strip('*').strip('+').replace(',', '')
+    #GO to link and extract company website 
+    url = data[1].find('a').get('href')
+    page = urllib.request.urlopen(url)
+    #Parse the HTML
+    soup = BeautifulSoup(page, 'html.parser')
+    #Find the last result in table and get the link
+    try:
+        tableRow = soup.find('table').find_all('tr')[-1]
+        webpage = tableRow.find('a').get('href')
+    except:
+        webpage = None
+    #Write each result to rows
+    rows.append([rank, companyname, webpage, description, location, yearend, salerise, sales, staff, comment])
+print(rows)
+
+#Create csv and write rows to output file
+with open('techtrach100.csv', 'w', newline='') as f_output:
+    csv_output = csv.writer(f_output)
+    csv.output.writerows(rows)
